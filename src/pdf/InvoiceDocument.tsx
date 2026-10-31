@@ -1,4 +1,4 @@
-import { Circle, Document, Font, Page, Path, StyleSheet, Svg, Text, View } from '@react-pdf/renderer'
+import { ClipPath, Defs, Document, Font, G, Page, Path, StyleSheet, Svg, Text, View } from '@react-pdf/renderer'
 import { RESTAURANT_ADDRESS, RESTAURANT_NAME, RESTAURANT_PHONE } from '@/lib/config'
 import type { InvoiceData } from '@/lib/types'
 import { formatIQD, formatNumber } from '@/lib/utils'
@@ -16,7 +16,7 @@ export type PaperSize = keyof typeof PAPER_WIDTH
 const styles = StyleSheet.create({
   page: { fontFamily: 'Rabar022', color: '#000', paddingHorizontal: 8, paddingVertical: 10 },
   center: { alignItems: 'center' },
-  title: { fontFamily: 'Rabar015', fontSize: 16, marginTop: 4, textAlign: 'center' },
+  title: { fontFamily: 'Rabar015', fontSize: 16, marginTop: 4, textAlign: 'center' ,  letterSpacing: 1.2, },
   sub: { fontSize: 9, textAlign: 'center', marginTop: 2 },
   small: { fontSize: 8, textAlign: 'center', marginTop: 1 },
   line: { borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: '#000', marginVertical: 6 },
@@ -36,14 +36,56 @@ const styles = StyleSheet.create({
   thanks: { fontSize: 9, textAlign: 'center', marginTop: 6 },
 })
 
+const CONE_PATH =
+  'M295 335 C300 300 350 282 470 282 C590 282 640 300 645 335 C650 450 620 560 595 650 C575 740 565 790 555 830 C535 868 405 868 385 830 C375 790 365 740 345 650 C320 560 290 450 295 335 Z'
+
+const HAT_PATH =
+  'M262 322 C214 298 192 262 192 226 C192 184 232 152 280 154 C302 155 318 163 326 177 C334 146 358 130 388 131 C396 72 442 40 500 40 C566 40 606 92 602 180 C640 150 700 156 724 196 C748 240 730 292 676 322'
+
+const SLICES = [
+  'M270 400 C360 440 410 370 490 410 C560 445 610 410 670 390',
+  'M270 500 C350 465 420 535 495 505 C565 478 610 520 670 495',
+  'M270 605 C360 640 410 575 490 610 C560 640 610 600 670 590',
+  'M270 705 C350 675 420 735 495 710 C560 690 600 725 670 700',
+  'M270 800 C350 830 410 775 490 805 C550 825 600 800 670 790',
+]
+
+/** Doner kebab + chef hat logo. Black only, with thicker lines so it prints sharp on thermal paper. */
 function LogoMark() {
+  const stroke = {
+    stroke: '#000',
+    fill: 'none',
+    strokeWidth: 34,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+  } as const
+
   return (
-    <Svg width={30} height={30} viewBox="0 0 64 64">
-      <Path d="M12 44h40" stroke="#000" strokeWidth={4} strokeLinecap="round" fill="none" />
-      <Path d="M18 44a14 14 0 0 1 28 0" stroke="#000" strokeWidth={4} strokeLinecap="round" fill="none" />
-      <Path d="M32 30v-3" stroke="#000" strokeWidth={4} strokeLinecap="round" fill="none" />
-      <Path d="M16 51h32" stroke="#000" strokeWidth={3} strokeLinecap="round" fill="none" />
-      <Circle cx={32} cy={23} r={3} fill="#000" />
+    <Svg width={27.4} height={30} viewBox="0 0 940 1030">
+      <Defs>
+        <ClipPath id="cone">
+          <Path d={CONE_PATH} />
+        </ClipPath>
+      </Defs>
+
+      {/* Chef hat */}
+      <Path d={HAT_PATH} {...stroke} />
+
+      {/* Skewer top */}
+      <Path d="M470 218 V285" {...stroke} strokeWidth={40} />
+
+      {/* Meat slices (cut at the cone edge) */}
+      <G clipPath="url(#cone)">
+        {SLICES.map((d) => (
+          <Path key={d} d={d} {...stroke} />
+        ))}
+      </G>
+
+      {/* Cone outline */}
+      <Path d={CONE_PATH} {...stroke} />
+
+      {/* Skewer bottom */}
+      <Path d="M470 860 V985" {...stroke} strokeWidth={40} />
     </Svg>
   )
 }

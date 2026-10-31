@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <img src="/logo.svg" alt="لۆگۆ" width={84} height={84} className="rounded-3xl shadow-lg" />
-          <h1 className="text-3xl">سیستەمی چێشتخانە</h1>
+          <h1 className="text-3xl">سیستەمی شاورمەی پیکی پلایندەرس</h1>
           <p className="text-sm text-muted-foreground">بۆ بەردەوامبوون بچۆرە ژوورەوە</p>
         </div>
 

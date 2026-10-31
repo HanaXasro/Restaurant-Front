@@ -1,6 +1,6 @@
 // Change these values to your restaurant information.
 // They are printed on the invoice and shown in the app.
-export const RESTAURANT_NAME = 'چێشتخانە'
+export const RESTAURANT_NAME = 'شاورمەی پیکی پلایندەرس'
 export const RESTAURANT_PHONE = '' // for example: '0750 000 0000'
 export const RESTAURANT_ADDRESS = '' // for example: 'کەرکووک'
 
