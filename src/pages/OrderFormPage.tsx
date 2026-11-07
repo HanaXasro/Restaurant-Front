@@ -1,16 +1,17 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Loader2, Minus, Plus, Printer, Save, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/PageHeader'
+import { SalesTypeTabs } from '@/components/SalesTypeTabs'
 import { SearchInput } from '@/components/SearchInput'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getErrorMessage, ordersApi, productsApi } from '@/lib/api'
-import type { InvoiceData, ProductDto } from '@/lib/types'
-import { useDebounce } from '@/lib/hooks'
+import { SalesType, type ProductDto } from '@/lib/types'
+import { parseSalesType, useDebounce, useSalesType } from '@/lib/hooks'
 import {
   cn,
   formatDateTime,
@@ -19,8 +20,6 @@ import {
   onlyDigits,
   orderNumber,
 } from '@/lib/utils'
-
-const InvoiceDialog = lazy(() => import('@/components/InvoiceDialog'))
 
 interface CartItem {
   key: string
@@ -34,31 +33,45 @@ interface CartItem {
 let keySeed = 0
 const nextKey = () => `k${++keySeed}`
 
+const EMPTY_CARTS: Record<SalesType, CartItem[]> = { [SalesType.Restaurant]: [], [SalesType.Delivery]: [] }
+
 export default function OrderFormPage() {
   const { id } = useParams()
   const isEdit = !!id
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // New sale: the tab is chosen here (and remembered). Edit: the type of the order (?type=1|2) is used.
+  const [storedType, setStoredType] = useSalesType()
+  const [editType, setEditType] = useState<SalesType | null>(parseSalesType(searchParams.get('type')))
+  const type: SalesType = isEdit ? (editType ?? storedType) : storedType
 
   const [products, setProducts] = useState<ProductDto[]>([])
   const [loading, setLoading] = useState(!!id) // loading the order (edit mode only)
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search)
-  const [cart, setCart] = useState<CartItem[]>([])
+  // each tab has its own list, so switching tabs never loses what was added
+  const [carts, setCarts] = useState<Record<SalesType, CartItem[]>>(EMPTY_CARTS)
+  const cart = carts[type]
+  const setCart = (update: CartItem[] | ((prev: CartItem[]) => CartItem[])) =>
+    setCarts((all) => ({
+      ...all,
+      [type]: typeof update === 'function' ? update(all[type]) : update,
+    }))
   const [saving, setSaving] = useState<'save' | 'print' | null>(null)
-  const [invoice, setInvoice] = useState<InvoiceData | null>(null)
   const cartRef = useRef<HTMLDivElement>(null)
 
   // load the order when editing (only orders of the current business day can be edited)
   useEffect(() => {
     let cancelled = false
     if (!id) {
-      setCart([])
+      setCarts(EMPTY_CARTS)
       return
     }
     ;(async () => {
       try {
-        const [order, all] = await Promise.all([ordersApi.get(id), productsApi.all()])
+        const [order, all] = await Promise.all([ordersApi.get(id), productsApi.all(type)])
         if (cancelled) return
         if (!isCurrentBusinessDay(order.createAt)) {
           toast.error('تەنها داواکارییەکانی ئەمڕۆ دەتوانرێت دەستکاری بکرێن')
@@ -66,8 +79,11 @@ export default function OrderFormPage() {
           return
         }
         const names = new Map(all.map((p) => [p.id, p.name]))
-        setCart(
-          (order.items ?? []).map((i) => ({
+        const orderType: SalesType = order.type ?? type
+        setEditType(orderType)
+        setCarts({
+          ...EMPTY_CARTS,
+          [orderType]: (order.items ?? []).map((i) => ({
             key: nextKey(),
             id: i.id,
             productId: i.productId,
@@ -75,7 +91,7 @@ export default function OrderFormPage() {
             quantity: i.quantity,
             unitPrice: i.unitPrice,
           })),
-        )
+        })
       } catch (err) {
         if (!cancelled) toast.error(getErrorMessage(err))
       } finally {
@@ -88,19 +104,19 @@ export default function OrderFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // load products from GET /api/product/List?search=...
+  // load products from GET /api/product/List?type=...&search=...
   useEffect(() => {
     let cancelled = false
     setLoadingProducts(true)
     productsApi
-      .all(debouncedSearch)
+      .all(type, debouncedSearch)
       .then((list) => !cancelled && setProducts(list))
       .catch((err) => !cancelled && toast.error(getErrorMessage(err)))
       .finally(() => !cancelled && setLoadingProducts(false))
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, type])
 
 
   const qtyOf = (productId: string) =>
@@ -140,6 +156,7 @@ export default function OrderFormPage() {
     setSaving(print ? 'print' : 'save')
     try {
       const body = {
+        type,
         items: cart.map((c) => ({
           id: c.id,
           productId: c.productId,
@@ -151,15 +168,16 @@ export default function OrderFormPage() {
       toast.success('بە سەرکەوتوویی پاشەکەوتکرا')
 
       if (print) {
-        setInvoice({
+        // print straight away (no preview window)
+        const { printInvoice } = await import('@/lib/print')
+        await printInvoice({
           number: orderNumber(order.id),
           date: formatDateTime(order.createAt ?? new Date()),
           items: cart.map((c) => ({ name: c.name, quantity: c.quantity, unitPrice: c.unitPrice })),
           total,
         })
-      } else {
-        finish()
       }
+      finish()
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -179,6 +197,9 @@ export default function OrderFormPage() {
         title={isEdit ? 'دەستکاریکردنی داواکاری' : 'فرۆشتنی نوێ'}
         description={isEdit ? `ژمارە: ${orderNumber(id!)}` : 'بەرهەم هەڵبژێرە بۆ زیادکردن بۆ لیستی فرۆشتن'}
       />
+
+      {/* In edit mode the type of the order cannot be changed */}
+      <SalesTypeTabs value={type} onChange={setStoredType} disabled={isEdit} />
 
       <div className="grid gap-6 pb-24 lg:grid-cols-[1fr_380px] lg:pb-0">
         {/* Products */}
@@ -340,18 +361,6 @@ export default function OrderFormPage() {
             بینینی لیست
           </Button>
         </div>
-      )}
-
-      {invoice && (
-        <Suspense fallback={null}>
-          <InvoiceDialog
-            data={invoice}
-            onClose={() => {
-              setInvoice(null)
-              finish()
-            }}
-          />
-        </Suspense>
       )}
     </>
   )

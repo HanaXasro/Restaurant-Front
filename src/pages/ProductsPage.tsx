@@ -6,6 +6,7 @@ import { MoneyInput } from '@/components/MoneyInput'
 import { PageHeader } from '@/components/PageHeader'
 import { Pager } from '@/components/Pager'
 import { SearchInput } from '@/components/SearchInput'
+import { SalesTypeTabs } from '@/components/SalesTypeTabs'
 import { TableState } from '@/components/TableState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,14 +23,23 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, productsApi } from '@/lib/api'
-import { usePagedData } from '@/lib/hooks'
+import { usePagedData, useSalesType } from '@/lib/hooks'
 import type { ProductDto } from '@/lib/types'
+import { SALES_TYPE_LABEL } from '@/lib/config'
 import { formatIQD } from '@/lib/utils'
 
 export default function ProductsPage() {
+  const [type, setType] = useSalesType()
   const { data, loading, search, setSearch, page, setPage, reload } = usePagedData<ProductDto>(
-    productsApi.list,
+    (f) => productsApi.list(f, type),
+    10,
+    type,
   )
+
+  function changeType(t: typeof type) {
+    setType(t)
+    setPage(1)
+  }
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ProductDto | null>(null)
@@ -56,8 +66,8 @@ export default function ProductsPage() {
 
     setSaving(true)
     try {
-      if (editing) await productsApi.update(editing.id, { name: n, price: v })
-      else await productsApi.create({ name: n, price: v })
+      if (editing) await productsApi.update(editing.id, { name: n, price: v, type })
+      else await productsApi.create({ name: n, price: v, type })
       toast.success('بە سەرکەوتوویی پاشەکەوتکرا')
       setFormOpen(false)
       reload()
@@ -109,6 +119,8 @@ export default function ProductsPage() {
           </Button>
         }
       />
+
+      <SalesTypeTabs value={type} onChange={changeType} />
 
       <Card>
         <div className="p-4">
@@ -171,7 +183,9 @@ export default function ProductsPage() {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'دەستکاریکردنی بەرهەم' : 'بەرهەمی نوێ'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'دەستکاریکردنی بەرهەم' : 'بەرهەمی نوێ'} — {SALES_TYPE_LABEL[type]}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4" noValidate>
             <div className="space-y-2">

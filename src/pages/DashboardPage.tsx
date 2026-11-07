@@ -13,21 +13,15 @@ import {
 import { toast } from 'sonner'
 import { DateField } from '@/components/DateField'
 import { PageHeader } from '@/components/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { SalesTypeTabs } from '@/components/SalesTypeTabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { dashboardApi, getErrorMessage } from '@/lib/api'
+import { useSalesType } from '@/lib/hooks'
 import type { DashboardDto } from '@/lib/types'
-import {
-  businessDateString,
-  cn,
-  formatDateTime,
-  formatIQD,
-  orderNumber,
-  parseDate,
-} from '@/lib/utils'
+import { businessDateString, cn, formatIQD, formatNumber } from '@/lib/utils'
 
 function StatCard({
   title,
@@ -67,6 +61,7 @@ interface Range {
 }
 
 export default function DashboardPage() {
+  const [type, setType] = useSalesType()
   // what the user types
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -80,14 +75,14 @@ export default function DashboardPage() {
     let cancelled = false
     setLoading(true)
     dashboardApi
-      .get(applied.from, applied.to)
+      .get(type, applied.from, applied.to)
       .then((d) => !cancelled && setData(d))
       .catch((err) => !cancelled && toast.error(getErrorMessage(err)))
       .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
-  }, [applied])
+  }, [applied, type])
 
   function show() {
     let f = from
@@ -118,18 +113,13 @@ export default function DashboardPage() {
     if (!applied.from && !applied.to) return 'ئەمڕۆ'
     if (applied.from && (!applied.to || applied.to === applied.from)) return applied.from
     return `${applied.from} — ${applied.to}`
-  }, [applied])
+  }, [applied, type])
 
   const income = data?.totalIncome ?? 0
   const expense = data?.totalExpense ?? 0
 
-  const recent = useMemo(
-    () =>
-      [...(data?.orders ?? [])].sort(
-        (a, b) => parseDate(b.createAt).getTime() - parseDate(a.createAt).getTime(),
-      ),
-    [data],
-  )
+  // every product that was sold in this period (all items, nothing is cut)
+  const soldItems = data?.orders ?? []
 
   return (
     <>
@@ -145,6 +135,8 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      <SalesTypeTabs value={type} onChange={setType} />
 
       {/* Date filter */}
       <Card className="mb-6">
@@ -206,49 +198,43 @@ export default function DashboardPage() {
 
       <Card className="mt-6">
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>دوایین داواکارییەکان</CardTitle>
+          <CardTitle>بەرهەمە فرۆشراوەکان</CardTitle>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/orders">هەموو</Link>
+            <Link to="/orders">داواکارییەکان</Link>
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ناوی بەرهەم</TableHead>
                 <TableHead>ژمارە</TableHead>
-                <TableHead>بەروار</TableHead>
-                <TableHead>کۆی گشتی</TableHead>
-                <TableHead>دۆخ</TableHead>
+                <TableHead>کۆی نرخ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 [0, 1, 2].map((i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={4}>
+                    <TableCell colSpan={3}>
                       <Skeleton className="h-8 w-full" />
                     </TableCell>
                   </TableRow>
                 ))
-              ) : recent.length === 0 ? (
+              ) : soldItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
-                    هیچ داواکارییەک نییە
+                  <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                    هیچ فرۆشتنێک نییە
                   </TableCell>
                 </TableRow>
               ) : (
-                recent.map((o) => (
-                  <TableRow key={o.id}>
+                soldItems.map((p, i) => (
+                  <TableRow key={`${p.name}-${i}`}>
+                    <TableCell className="text-base">{p.name}</TableCell>
                     <TableCell dir="ltr" className="text-end">
-                      {orderNumber(o.id)}
+                      {formatNumber(p.totalQuantity)}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">{formatDateTime(o.createAt)}</TableCell>
-                    <TableCell className="whitespace-nowrap">{formatIQD(o.totalAmount)}</TableCell>
-                    <TableCell>
-                      <Badge variant={o.isEnable ? 'success' : 'destructive'}>
-                        {o.isEnable ? 'چالاک' : 'هەڵوەشاوە'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{formatIQD(p.totalPrice)}</TableCell>
                   </TableRow>
                 ))
               )}

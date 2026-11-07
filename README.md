@@ -38,9 +38,18 @@ Open http://localhost:5173 — login: `admin` / `ad1234`.
 ## Step 7 – Restaurant info on the invoice
 Edit `src/lib/config.ts` (name, phone, address).
 
-## Step 8 – Print on the mini printer
-Sales -> "پاشەکەوتکردن و چاپکردن" (or the printer icon in Orders) -> choose 80mm or 58mm -> چاپکردن.
-In the browser print window select your mini printer and set margins to "None".
+## Step 8 – Print on the mini printer (72.1 mm)
+Sales -> "پاشەکەوتکردن و چاپکردن" (or the printer icon in Orders). The receipt prints
+straight away, there is no preview window. In the browser print window select your
+mini printer and set margins to "None".
+The paper width is `PAPER_WIDTH_MM` in `src/lib/config.ts` (72.1).
+
+## Step 9 – Sales types (Restaurant = 1, Delivery = 2)
+Dashboard, Orders, Products and New sale each have two tabs (Restaurant / Delivery).
+The selected tab is remembered in the browser.
+- Create / update Product and Order send `type` in the JSON body.
+- Every GET sends `type` in the query string: `/api/product`, `/api/product/List`, `/api/order`, `/api/dashboard`.
+- Tab names are in `SALES_TYPE_LABEL` in `src/lib/config.ts`.
 
 ## Build for production
 ```bash

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Pencil, Plus, Printer, RotateCcw, Search } from 'lucide-react'
 import { toast } from 'sonner'
@@ -6,6 +6,7 @@ import { DateField } from '@/components/DateField'
 import { PageHeader } from '@/components/PageHeader'
 import { Pager } from '@/components/Pager'
 import { SearchInput } from '@/components/SearchInput'
+import { SalesTypeTabs } from '@/components/SalesTypeTabs'
 import { TableState } from '@/components/TableState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,12 +14,10 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getErrorMessage, ordersApi, productsApi } from '@/lib/api'
+import { useSalesType } from '@/lib/hooks'
 import { invoiceFromOrder } from '@/lib/invoice'
-import type { InvoiceData, OrderDto, Pagination } from '@/lib/types'
+import type { OrderDto, Pagination, SalesType } from '@/lib/types'
 import { formatDateTime, formatIQD, isCurrentBusinessDay, orderNumber } from '@/lib/utils'
-
-// the PDF library is big, so it loads only when needed
-const InvoiceDialog = lazy(() => import('@/components/InvoiceDialog'))
 
 const PAGE_SIZE = 10
 
@@ -31,6 +30,7 @@ interface Filters {
 const EMPTY: Filters = { search: '', from: '', to: '' }
 
 export default function OrdersPage() {
+  const [type, setType] = useSalesType()
   // what the user types
   const [draft, setDraft] = useState<Filters>(EMPTY)
   // what was applied with the "search" button
@@ -41,7 +41,6 @@ export default function OrdersPage() {
   const [data, setData] = useState<Pagination<OrderDto> | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const [invoice, setInvoice] = useState<InvoiceData | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -50,6 +49,7 @@ export default function OrdersPage() {
     ordersApi
       .list(
         { search: applied.search.trim() || undefined, page, pageSize: PAGE_SIZE },
+        type,
         applied.from || undefined,
         applied.to || undefined,
       )
@@ -59,7 +59,7 @@ export default function OrdersPage() {
     return () => {
       cancelled = true
     }
-  }, [applied, page, tick])
+  }, [applied, page, tick, type])
 
   function runSearch() {
     let { from } = draft
@@ -75,6 +75,11 @@ export default function OrdersPage() {
     setTick((t) => t + 1)
   }
 
+  function changeType(t: SalesType) {
+    setType(t)
+    setPage(1)
+  }
+
   function reset() {
     setDraft(EMPTY)
     setApplied(EMPTY)
@@ -87,10 +92,12 @@ export default function OrdersPage() {
       const full = await ordersApi.get(o.id)
       let names: Map<string, string> | undefined
       if ((full.items ?? []).some((i) => !i.product)) {
-        const products = await productsApi.all()
+        const products = await productsApi.all(type)
         names = new Map(products.map((p) => [p.id, p.name]))
       }
-      setInvoice(invoiceFromOrder(full, names))
+      // print straight away (no preview window)
+      const { printInvoice } = await import('@/lib/print')
+      await printInvoice(invoiceFromOrder(full, names))
     } catch (err) {
       toast.error(getErrorMessage(err))
     } finally {
@@ -124,6 +131,8 @@ export default function OrdersPage() {
           </Button>
         }
       />
+
+      <SalesTypeTabs value={type} onChange={changeType} />
 
       <Card>
         <form
@@ -207,7 +216,7 @@ export default function OrdersPage() {
                         </Button>
                         {canEdit ? (
                           <Button variant="ghost" size="icon" asChild>
-                            <Link to={`/orders/${o.id}/edit`} aria-label="دەستکاریکردن">
+                            <Link to={`/orders/${o.id}/edit?type=${type}`} aria-label="دەستکاریکردن">
                               <Pencil />
                             </Link>
                           </Button>
@@ -232,12 +241,6 @@ export default function OrdersPage() {
 
         <Pager page={page} totalPages={data?.totalPages ?? 1} onChange={setPage} />
       </Card>
-
-      {invoice && (
-        <Suspense fallback={null}>
-          <InvoiceDialog data={invoice} onClose={() => setInvoice(null)} />
-        </Suspense>
-      )}
     </>
   )
 }

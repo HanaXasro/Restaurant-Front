@@ -1,3 +1,11 @@
+// ---------- Sales type (same as the C# enum SalesType) ----------
+// Restaurant = 1, Delivery = 2
+export const SalesType = {
+  Restaurant: 1,
+  Delivery: 2,
+} as const
+export type SalesType = (typeof SalesType)[keyof typeof SalesType]
+
 // ---------- DTOs (same as the backend) ----------
 export interface BaseDto {
   id: string
@@ -8,6 +16,7 @@ export interface BaseDto {
 export interface ProductDto extends BaseDto {
   name: string
   price: number
+  type?: SalesType
 }
 
 export interface ExpenseDto extends BaseDto {
@@ -28,14 +37,23 @@ export interface OrderItemDto extends BaseDto {
 export interface OrderDto extends BaseDto {
   orderDate: string
   totalAmount: number
+  type?: SalesType
   items?: OrderItemDto[] | null
 }
 
+/** C#: ProductDashboardDto */
+export interface ProductDashboardDto {
+  name: string
+  totalPrice: number
+  totalQuantity: number
+}
+
+/** C#: DashboardDto */
 export interface DashboardDto {
   totalExpense: number
   totalIncome: number
   totalOrder: number
-  orders?: OrderDto[] | null
+  orders?: ProductDashboardDto[] | null
 }
 
 // ---------- Requests ----------
@@ -50,6 +68,7 @@ export interface FilterOrderRequest {
 export interface ProductRequest {
   name: string
   price: number
+  type: SalesType
 }
 
 export interface ExpenseRequest {
@@ -66,6 +85,7 @@ export interface OrderItemRequest {
 }
 
 export interface OrderRequest {
+  type: SalesType
   items: OrderItemRequest[]
 }
 

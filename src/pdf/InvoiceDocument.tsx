@@ -1,5 +1,5 @@
 import { ClipPath, Defs, Document, Font, G, Page, Path, StyleSheet, Svg, Text, View } from '@react-pdf/renderer'
-import { RESTAURANT_ADDRESS, RESTAURANT_NAME, RESTAURANT_PHONE } from '@/lib/config'
+import { PAPER_WIDTH_MM, RESTAURANT_ADDRESS, RESTAURANT_NAME, RESTAURANT_PHONE } from '@/lib/config'
 import type { InvoiceData } from '@/lib/types'
 import { formatIQD, formatNumber } from '@/lib/utils'
 
@@ -9,9 +9,8 @@ Font.register({ family: 'Rabar015', src: '/fonts/rabar_015.ttf' })
 // do not cut Kurdish words
 Font.registerHyphenationCallback((word) => [word])
 
-/** Paper width in points (1mm = 2.8346pt) */
-export const PAPER_WIDTH = { '80': 226.77, '58': 164.41 } as const
-export type PaperSize = keyof typeof PAPER_WIDTH
+/** Paper width in points (1mm = 2.8346pt). 72.1mm -> 204.37pt */
+export const PAPER_WIDTH = Math.round(PAPER_WIDTH_MM * 2.8346 * 100) / 100
 
 const styles = StyleSheet.create({
   page: { fontFamily: 'Rabar022', color: '#000', paddingHorizontal: 8, paddingVertical: 10 },
@@ -91,8 +90,8 @@ function LogoMark() {
 }
 
 /** Height of the receipt, so it prints on one piece of paper without extra pages. */
-function estimateHeight(data: InvoiceData, width: number): number {
-  const charsPerLine = width > 200 ? 13 : 8
+function estimateHeight(data: InvoiceData): number {
+  const charsPerLine = 11
   const lines = data.items.reduce(
     (sum, it) => sum + Math.max(1, Math.ceil(it.name.length / charsPerLine)),
     0,
@@ -101,10 +100,10 @@ function estimateHeight(data: InvoiceData, width: number): number {
   return 235 + extra + data.items.length * 7 + lines * 14
 }
 
-/** Receipt for a mini thermal printer (80mm or 58mm). */
-export function buildInvoiceDocument(data: InvoiceData, paper: PaperSize = '80') {
-  const width = PAPER_WIDTH[paper]
-  const height = estimateHeight(data, width)
+/** Receipt for a mini thermal printer (72.1mm wide). */
+export function buildInvoiceDocument(data: InvoiceData) {
+  const width = PAPER_WIDTH
+  const height = estimateHeight(data)
 
   return (
     <Document title={`پسوولە ${data.number}`} author={RESTAURANT_NAME}>
@@ -159,4 +158,4 @@ export function buildInvoiceDocument(data: InvoiceData, paper: PaperSize = '80')
       </Page>
     </Document>
   )
-}
+}

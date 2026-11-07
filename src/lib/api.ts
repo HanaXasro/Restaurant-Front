@@ -9,6 +9,7 @@ import type {
   Pagination,
   ProductDto,
   ProductRequest,
+  SalesType,
 } from './types'
 
 export const api = axios.create({
@@ -65,21 +66,25 @@ function normalize<T>(raw: any, f: FilterOrderRequest): Pagination<T> {
 async function list<T>(
   url: string,
   f: FilterOrderRequest,
-  extra: Record<string, string | undefined> = {},
+  extra: Record<string, string | number | undefined> = {},
 ): Promise<Pagination<T>> {
-  const extraClean = Object.fromEntries(Object.entries(extra).filter(([, v]) => !!v))
+  const extraClean = Object.fromEntries(
+    Object.entries(extra).filter(([, v]) => v !== undefined && v !== ''),
+  )
   const { data } = await api.get(url, { params: { ...clean(f), ...extraClean } })
   return normalize<T>(data, f)
 }
 
 // ---------- Products ----------
+// `type` is [FromQuery] and required in the backend, so every GET sends it.
 export const productsApi = {
-  list: (f: FilterOrderRequest) => list<ProductDto>('/api/product', f),
-  /** GET /api/product/List?search=  -> plain list (used in the sales page) */
-  all: async (search?: string) =>
+  /** GET /api/product?type=1&search=&page=&pageSize= */
+  list: (f: FilterOrderRequest, type: SalesType) => list<ProductDto>('/api/product', f, { type }),
+  /** GET /api/product/List?type=1&search=  -> plain list (used in the sales page) */
+  all: async (type: SalesType, search?: string) =>
     (
       await api.get<ProductDto[]>('/api/product/List', {
-        params: search?.trim() ? { search: search.trim() } : undefined,
+        params: { type, ...(search?.trim() ? { search: search.trim() } : {}) },
       })
     ).data,
   get: async (id: string) => (await api.get<ProductDto>(`/api/product/${id}`)).data,
@@ -95,9 +100,9 @@ export const productsApi = {
 
 // ---------- Orders ----------
 export const ordersApi = {
-  /** fromDate / toDate are DateOnly: yyyy-MM-dd */
-  list: (f: FilterOrderRequest, fromDate?: string, toDate?: string) =>
-    list<OrderDto>('/api/order', f, { fromDate, toDate }),
+  /** GET /api/order?type=1&fromDate=&toDate=  (fromDate / toDate are DateOnly: yyyy-MM-dd) */
+  list: (f: FilterOrderRequest, type: SalesType, fromDate?: string, toDate?: string) =>
+    list<OrderDto>('/api/order', f, { type, fromDate, toDate }),
   get: async (id: string) => (await api.get<OrderDto>(`/api/order/${id}`)).data,
   create: async (body: OrderRequest) => (await api.post<OrderDto>('/api/order', body)).data,
   update: async (id: string, body: OrderRequest) =>
@@ -108,11 +113,11 @@ export const ordersApi = {
 
 // ---------- Dashboard ----------
 export const dashboardApi = {
-  /** Without dates the backend returns the current business day. */
-  get: async (fromDate?: string, toDate?: string) =>
+  /** GET /api/dashboard?type=1&fromDate=&toDate=  Without dates the backend returns the current business day. */
+  get: async (type: SalesType, fromDate?: string, toDate?: string) =>
     (
       await api.get<DashboardDto>('/api/dashboard', {
-        params: { fromDate: fromDate || undefined, toDate: toDate || undefined },
+        params: { type, fromDate: fromDate || undefined, toDate: toDate || undefined },
       })
     ).data,
 }

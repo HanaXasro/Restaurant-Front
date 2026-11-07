@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { getErrorMessage } from './api'
-import type { FilterOrderRequest, Pagination } from './types'
+import { SalesType, type FilterOrderRequest, type Pagination } from './types'
 
 export function useDebounce<T>(value: T, delay = 400): T {
   const [debounced, setDebounced] = useState(value)
@@ -12,10 +12,15 @@ export function useDebounce<T>(value: T, delay = 400): T {
   return debounced
 }
 
-/** Loads a paginated list with search + page. Used by Products, Orders and Expenses. */
+/**
+ * Loads a paginated list with search + page. Used by Products and Expenses.
+ * `scope` is any extra value the fetcher depends on (for example the sales type):
+ * when it changes the list is loaded again.
+ */
 export function usePagedData<T>(
   fetcher: (f: FilterOrderRequest) => Promise<Pagination<T>>,
   pageSize = 10,
+  scope: string | number = '',
 ) {
   const [search, setSearchState] = useState('')
   const debounced = useDebounce(search)
@@ -48,7 +53,29 @@ export function usePagedData<T>(
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced, page, pageSize, tick])
+  }, [debounced, page, pageSize, tick, scope])
 
   return { data, loading, search, setSearch, page, setPage, reload }
+}
+
+const SALES_TYPE_KEY = 'restaurant_sales_type'
+
+export function parseSalesType(v: unknown): SalesType | null {
+  const n = Number(v)
+  return n === SalesType.Restaurant || n === SalesType.Delivery ? n : null
+}
+
+/**
+ * The selected tab (Restaurant / Delivery). It is remembered in the browser,
+ * so Dashboard, Orders, Products and New sale all open on the same tab.
+ */
+export function useSalesType(): [SalesType, (t: SalesType) => void] {
+  const [type, setTypeState] = useState<SalesType>(
+    () => parseSalesType(localStorage.getItem(SALES_TYPE_KEY)) ?? SalesType.Restaurant,
+  )
+  const setType = useCallback((t: SalesType) => {
+    setTypeState(t)
+    localStorage.setItem(SALES_TYPE_KEY, String(t))
+  }, [])
+  return [type, setType]
 }
