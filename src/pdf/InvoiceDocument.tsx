@@ -32,7 +32,7 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
   totalLabel: { fontFamily: 'Rabar015', fontSize: 11, textAlign: 'right' },
   totalValue: { fontFamily: 'Rabar015', fontSize: 12, textAlign: 'left' },
-  thanks: { fontSize: 9, textAlign: 'center', marginTop: 6 },
+  thanks: { fontSize: 9, textAlign: 'center',  },
 })
 
 const CONE_PATH =
@@ -153,9 +153,17 @@ export function buildInvoiceDocument(data: InvoiceData) {
         </View>
 
         <View style={styles.line} />
+          <Text style={styles.small}>
+           ناونیشان: جووت سایدی بحرکەی کۆن بەرامبەر مزگەوتی بوخاری
+          </Text>
+
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center' }}>
+  <Text style={styles.small}> :ژمارە مۆبایل</Text>
+  <Text style={styles.small}>0751 722 6383</Text>
+</View>
 
         <Text style={styles.thanks}>سوپاس بۆ سەردانتان</Text>
       </Page>
     </Document>
   )
-}
+}
